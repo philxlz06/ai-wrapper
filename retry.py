@@ -1,4 +1,8 @@
 # retry.py
+#Goal
+
+#If a request fails, don’t retry instantly → retry safely.
+
 import time
 import random
 

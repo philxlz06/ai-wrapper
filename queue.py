@@ -1,4 +1,10 @@
 # queue.py
+#Goal
+
+#Never drop a request.
+
+#If rate-limited → wait, then send later.
+
 import time
 from collections import deque
 
