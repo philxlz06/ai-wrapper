@@ -1,38 +1,53 @@
 # client.py
+import openai
+import os
+import time
+import random
 from retry import retry
 from circuit_breaker import CircuitBreaker
 from rate_limiter import TokenBucket
 
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
 breaker = CircuitBreaker()
 bucket = TokenBucket()
 
-def call_ai_api(request_id):
+
+def call_ai_api(request_id, prompt="Hello"):
+    # ----------------------
+    # Circuit breaker
+    # ----------------------
     if not breaker.allow():
         print(f"Circuit open. Dropping request {request_id}")
         return
 
-    # Wait for token
+    # ----------------------
+    # Token bucket wait
+    # ----------------------
     allowed = False
     while not allowed:
-        allowed = bucket._refill() or bucket.tokens >= 1
-        if allowed:
+        bucket._refill()
+        if bucket.tokens >= 1:
             bucket.tokens -= 1
-            break
-        # short sleep to avoid busy loop
-        import time; time.sleep(0.01)
+            allowed = True
+        else:
+            time.sleep(0.01)
 
-    # Wrap fake API call with retry
-    def fake_request():
-        # simulate intermittent failure
-        import random
-        if random.random() < 0.2:
-            raise Exception("API fail")
-        return f"Response for {request_id}"
+    # ----------------------
+    # Retry wrapper
+    # ----------------------
+    def request_fn():
+        # Real API call
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
 
     try:
-        result = retry(fake_request)
+        result = retry(request_fn)
         breaker.record_success()
-        print(f"Success: {result}")
+        print(f"✅ Success [{request_id}]: {result[:50]}...")
     except Exception as e:
         breaker.record_failure()
-        print(f"Failed: {request_id} -> {e}")
+        print(f"❌ Failed [{request_id}]: {e}")
