@@ -1,5 +1,3 @@
-# main.py
-
 import asyncio
 from rate_limiter import TokenBucket
 
