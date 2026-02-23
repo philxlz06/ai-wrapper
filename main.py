@@ -1,16 +1,28 @@
-import asyncio
-from rate_limiter import TokenBucket
+# main.py
+import threading
+import time
+from queue import deque
+from client import call_ai_api
 
+request_queue = deque()
 
-async def test():
-    bucket = TokenBucket()
-    success = 0
+# simulate 3 concurrent workers
+def worker():
+    while True:
+        if request_queue:
+            req = request_queue.popleft()
+            call_ai_api(req)
+        else:
+            time.sleep(0.01)
 
-    for _ in range(1100):
-        if await bucket.acquire():
-            success += 1
+for _ in range(3):
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
 
-    print("Allowed:", success)
+# simulate 1100 requests
+for i in range(1100):
+    request_queue.append(i)
 
-
-asyncio.run(test())
+# keep main alive
+while True:
+    time.sleep(1)
